@@ -51,6 +51,7 @@ typedef NS_ENUM(NSUInteger, FLAnimatedImageFrameCacheSize) {
 
 @interface FLAnimatedImage ()
 
+@property (nonatomic, strong) NSMutableDictionary *cache;
 @property (nonatomic, assign, readonly) NSUInteger frameCacheSizeOptimal; // The optimal number of frames to cache based on image size & number of frames; never changes
 @property (nonatomic, assign, readonly, getter=isPredrawingEnabled) BOOL predrawingEnabled; // Enables predrawing of images to improve performance.
 @property (nonatomic, assign) NSUInteger frameCacheSizeMaxInternal; // Allow to cap the cache size e.g. when memory warnings occur; 0 means no specific limit (default)
@@ -196,6 +197,7 @@ static NSHashTable *allAnimatedImagesWeak;
         _predrawingEnabled = isPredrawingEnabled;
         
         // Initialize internal data structures
+        _cache = [[NSMutableDictionary alloc] init];
         _cachedFramesForIndexes = [[NSMutableDictionary alloc] init];
         _cachedFrameIndexes = [[NSMutableIndexSet alloc] init];
         _requestedFrameIndexes = [[NSMutableIndexSet alloc] init];
@@ -239,6 +241,7 @@ static NSHashTable *allAnimatedImagesWeak;
                 CGImageRef frameImageRef = CGImageSourceCreateImageAtIndex(_imageSource, i, NULL);
                 if (frameImageRef) {
                     UIImage *frameImage = [UIImage imageWithCGImage:frameImageRef];
+                    [_cache setValue:frameImage forKey:[[NSString alloc] initWithFormat:@"%zu", i]];
                     // Check for valid `frameImage` before parsing its properties as frames can be corrupted (and `frameImage` even `nil` when `frameImageRef` was valid).
                     if (frameImage) {
                         // Set poster image
@@ -378,6 +381,8 @@ static NSHashTable *allAnimatedImagesWeak;
 // Note: both consumer and producer are throttled: consumer by frame timings and producer by the available memory (max buffer window size).
 - (UIImage *)imageLazilyCachedAtIndex:(NSUInteger)index
 {
+    
+    return _cache[[[NSString alloc] initWithFormat:@"%d", index]];
     // Early return if the requested index is beyond bounds.
     // Note: We're comparing an index with a count and need to bail on greater than or equal to.
     if (index >= self.frameCount) {
